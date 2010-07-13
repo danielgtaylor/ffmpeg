@@ -122,6 +122,8 @@ typedef struct MOVStreamContext {
     int wrong_dts;        ///< dts are wrong due to huge ctts offset (iMovie files)
     int width;            ///< tkhd width
     int height;           ///< tkhd height
+    int display_width;    ///< width to overide display of video
+    int display_height;   ///< height to overide display of video
     int dts_shift;        ///< dts shift when ctts is negative
 } MOVStreamContext;
 

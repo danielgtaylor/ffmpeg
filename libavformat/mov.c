@@ -1814,6 +1814,15 @@ static int mov_read_trak(MOVContext *c, ByteIOContext *pb, MOVAtom atom)
                   sc->time_scale*st->nb_frames, st->duration, INT_MAX);
     }
 
+    /*
+        If a display width / height are set we need to set a proper aspect
+        ratio as Quicktime uses this to force the size of the video.
+    */
+    if (sc->display_width)
+        st->sample_aspect_ratio = av_d2q(
+            ((double) sc->display_width / sc->display_height) / 
+            ((double) sc->width / sc->height), INT_MAX);
+
     switch (st->codec->codec_id) {
 #if CONFIG_H261_DECODER
     case CODEC_ID_H261:
@@ -2195,6 +2204,35 @@ static int mov_read_elst(MOVContext *c, ByteIOContext *pb, MOVAtom atom)
     return 0;
 }
 
+static int mov_read_clef(MOVContext *c, ByteIOContext *pb, MOVAtom atom)
+{
+    /*
+        Track Clean Aperture Dimensions - overrides other dimensions and
+        aspect ratio information.
+    */
+    unsigned int width;
+    unsigned int height;
+    AVStream *st;
+    MOVStreamContext *sc;
+    
+    get_be16(pb); /* flags */
+    width = get_be32(pb); /* cleanApertureWidth */
+    height = get_be32(pb); /* cleanApertureHeight */
+    
+    av_log(c->fc, AV_LOG_DEBUG, "clef atom read, forcing size to %ux%u\n",
+           width, height);
+
+    if (c->fc->nb_streams < 1)
+        return 0;
+    st = c->fc->streams[c->fc->nb_streams-1];
+    sc = st->priv_data;
+    
+    sc->display_width = width;
+    sc->display_height = height;
+
+    return 0;
+}
+
 static const MOVParseTableEntry mov_default_parse_table[] = {
 { MKTAG('a','v','s','s'), mov_read_extradata },
 { MKTAG('c','h','p','l'), mov_read_chpl },
@@ -2247,6 +2285,8 @@ static const MOVParseTableEntry mov_default_parse_table[] = {
 { MKTAG('e','s','d','s'), mov_read_esds },
 { MKTAG('w','i','d','e'), mov_read_wide }, /* place holder */
 { MKTAG('c','m','o','v'), mov_read_cmov },
+{ MKTAG('t','a','p','t'), mov_read_default },
+{ MKTAG('c','l','e','f'), mov_read_clef },
 { 0, NULL }
 };
 
