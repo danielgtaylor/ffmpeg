@@ -52,6 +52,17 @@ struct ReSampleContext {
     unsigned buffer_size[2];         ///< sizes of allocated buffers
 };
 
+/*
+*/
+static short clip_short(int v) {
+    if (v < -32768)
+        v = -32768;
+    else if (v > 32767)
+        v = 32767;
+    return (short) v;
+}
+
+
 /* n1: number of samples */
 static void stereo_to_mono(short *output, short *input, int n1)
 {
@@ -103,14 +114,43 @@ static void mono_to_stereo(short *output, short *input, int n1)
     }
 }
 
-/* XXX: should use more abstract 'N' channels system */
-static void stereo_split(short *output1, short *output2, short *input, int n)
-{
+/* XXX: make this better.  channels will always be >= 2.
+ - Left = front_left + rear_gain * rear_left + center_gain * center
+ - Right = front_right + rear_gain * rear_right + center_gain * center
+ where rear_gain is usually around 0.5-1.0 and center_gain is almost always 0.7 (-3 dB) if I recall correctly.  */
+static void multi_to_stereo_split(short *output1, short *output2, short *input, int n, int channels) {
     int i;
+    short l,r;
 
     for(i=0;i<n;i++) {
-        *output1++ = *input++;
-        *output2++ = *input++;
+        if (channels == 2) {
+            /* simple stereo to stereo. Input is: l, r */
+            l = input[0];
+            r = input[1];
+        } else if (channels == 6) {
+            /* 5.1 to stereo. l, c, r, ls, rs, sw */
+            int fl,fr,c,rl,rr,lfe;
+            fl = input[0];
+            c = input[1];
+            fr = input[2];
+            rl = input[3];
+            rr = input[4];
+            lfe = input[5];
+
+            l = clip_short(fl + (0.5 * rl) + (0.7 * c));
+            r = clip_short(fr + (0.5 * rr) + (0.7 * c));
+        } else {
+            /* channels must be 3-5, or >= 7. l, c, r, ? */
+            l = input[0];
+            r = input[2];
+        }
+
+        /* output l & r. */
+        *output1++ = l;
+        *output2++ = r;
+
+        /* increment input. */
+        input += channels;
     }
 }
 
@@ -150,9 +190,9 @@ ReSampleContext *av_audio_resample_init(int output_channels, int input_channels,
 {
     ReSampleContext *s;
 
-    if ( input_channels > 2)
+	 if ((input_channels > 2) && (input_channels != 6))
       {
-        av_log(NULL, AV_LOG_ERROR, "Resampling with input channels greater than 2 unsupported.\n");
+		av_log(NULL, AV_LOG_ERROR, "Resampling with input channels other than 1,2, or 6 is unsupported.\n");
         return NULL;
       }
 
@@ -312,7 +352,7 @@ int audio_resample(ReSampleContext *s, short *output, short *input, int nb_sampl
     } else if (s->output_channels >= 2) {
         buftmp3[0] = bufout[0];
         buftmp3[1] = bufout[1];
-        stereo_split(buftmp2[0], buftmp2[1], input, nb_samples);
+        multi_to_stereo_split(buftmp2[0], buftmp2[1], input, nb_samples, s->input_channels);
     } else {
         buftmp3[0] = output;
         memcpy(buftmp2[0], input, nb_samples*sizeof(short));
