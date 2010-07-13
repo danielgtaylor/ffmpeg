@@ -39,6 +39,7 @@ void avfilter_register_all(void)
     REGISTER_FILTER (FORMAT,      format,      vf);
     REGISTER_FILTER (NOFORMAT,    noformat,    vf);
     REGISTER_FILTER (NULL,        null,        vf);
+    REGISTER_FILTER (OVERLAY,     overlay,     vf);
     REGISTER_FILTER (PAD,         pad,         vf);
     REGISTER_FILTER (PIXDESCTEST, pixdesctest, vf);
     REGISTER_FILTER (PIXELASPECT, pixelaspect, vf);
