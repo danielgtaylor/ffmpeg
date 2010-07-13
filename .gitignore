@@ -1,0 +1,10 @@
+*.d
+*.o
+*.pc
+*.a
+.version
+config.h
+config.log
+config.mak
+version.h
+libavutil/avconfig.h
