@@ -221,6 +221,7 @@ static int mov_read_udta_string(MOVContext *c, ByteIOContext *pb, MOVAtom atom)
 
 static int mov_read_chpl(MOVContext *c, ByteIOContext *pb, MOVAtom atom)
 {
+    return; /* HACK: Prevent chapters from being used */
     int64_t start;
     int i, nb_chapters, str_len, version;
     char str[256+1];
@@ -2338,6 +2339,7 @@ static int mov_probe(AVProbeData *p)
 // must be done after parsing all trak because there's no order requirement
 static void mov_read_chapters(AVFormatContext *s)
 {
+    return; /* HACK: Prevent chapters from being used */
     MOVContext *mov = s->priv_data;
     AVStream *st = NULL;
     MOVStreamContext *sc;
