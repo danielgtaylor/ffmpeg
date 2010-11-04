@@ -1899,6 +1899,8 @@ static void print_sdp(AVFormatContext **avc, int n)
 
 static int copy_chapters(int infile, int outfile)
 {
+    return 0; /* HACK prevent copying any chapter info */
+    
     AVFormatContext *is = input_files[infile];
     AVFormatContext *os = output_files[outfile];
     int i;
