@@ -578,6 +578,7 @@ static int adpcm_encode_frame(AVCodecContext *avctx,
             }
         }
 
+        flush_put_bits(&pb);
         dst += put_bits_count(&pb)>>3;
         break;
     }
@@ -720,6 +721,12 @@ static av_cold int adpcm_decode_init(AVCodecContext * avctx)
     switch(avctx->codec->id) {
     case CODEC_ID_ADPCM_CT:
         c->status[0].step = c->status[1].step = 511;
+        break;
+    case CODEC_ID_ADPCM_IMA_WAV:
+        if (avctx->bits_per_coded_sample != 4) {
+            av_log(avctx, AV_LOG_ERROR, "Only 4-bit ADPCM IMA WAV files are supported\n");
+            return -1;
+        }
         break;
     case CODEC_ID_ADPCM_IMA_WS:
         if (avctx->extradata && avctx->extradata_size == 2 * 4) {

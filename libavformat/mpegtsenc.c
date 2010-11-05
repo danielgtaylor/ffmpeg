@@ -276,8 +276,13 @@ static void mpegts_write_pmt(AVFormatContext *s, MpegTSService *service)
                 *q++ = language[1];
                 *q++ = language[2];
                 *q++ = 0x10; /* normal subtitles (0x20 = if hearing pb) */
-                put16(&q, 1); /* page id */
-                put16(&q, 1); /* ancillary page id */
+                if(st->codec->extradata_size == 4) {
+                    memcpy(q, st->codec->extradata, 4);
+                    q += 4;
+                } else {
+                    put16(&q, 1); /* page id */
+                    put16(&q, 1); /* ancillary page id */
+                }
             }
             break;
         case AVMEDIA_TYPE_VIDEO:
@@ -846,7 +851,7 @@ static int mpegts_write_packet(AVFormatContext *s, AVPacket *pkt)
             memcpy(data+6, pkt->data, pkt->size);
             AV_WB32(data, 0x00000001);
             data[4] = 0x09;
-            data[5] = 0xe0; // any slice type
+            data[5] = 0xf0; // any slice type (0xe) + rbsp stop one bit
             buf  = data;
             size = pkt->size+6;
         }

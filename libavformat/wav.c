@@ -23,7 +23,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "avformat.h"
-#include "raw.h"
+#include "pcm.h"
 #include "riff.h"
 
 typedef struct {
@@ -94,6 +94,8 @@ static int wav_write_trailer(AVFormatContext *s)
     ByteIOContext *pb  = s->pb;
     WAVContext    *wav = s->priv_data;
     int64_t file_size;
+
+    put_flush_packet(pb);
 
     if (!url_is_streamed(s->pb)) {
         ff_end_tag(pb, wav->data);

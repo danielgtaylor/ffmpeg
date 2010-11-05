@@ -38,7 +38,7 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
     struct addrinfo hints, *ai, *cur_ai;
     int port, fd = -1;
     TCPContext *s = NULL;
-    fd_set wfds;
+    fd_set wfds, efds;
     int fd_max, ret;
     struct timeval tv;
     socklen_t optlen;
@@ -54,8 +54,13 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portstr, sizeof(portstr), "%d", port);
-    if (getaddrinfo(hostname, portstr, &hints, &ai))
+    ret = getaddrinfo(hostname, portstr, &hints, &ai);
+    if (ret) {
+        av_log(NULL, AV_LOG_ERROR,
+               "Failed to resolve hostname %s: %s\n",
+               hostname, gai_strerror(ret));
         return AVERROR(EIO);
+    }
 
     cur_ai = ai;
 
@@ -82,19 +87,25 @@ static int tcp_open(URLContext *h, const char *uri, int flags)
             }
             fd_max = fd;
             FD_ZERO(&wfds);
+            FD_ZERO(&efds);
             FD_SET(fd, &wfds);
+            FD_SET(fd, &efds);
             tv.tv_sec = 0;
             tv.tv_usec = 100 * 1000;
-            ret = select(fd_max + 1, NULL, &wfds, NULL, &tv);
-            if (ret > 0 && FD_ISSET(fd, &wfds))
+            ret = select(fd_max + 1, NULL, &wfds, &efds, &tv);
+            if (ret > 0 && (FD_ISSET(fd, &wfds) || FD_ISSET(fd, &efds)))
                 break;
         }
 
         /* test error */
         optlen = sizeof(ret);
         getsockopt (fd, SOL_SOCKET, SO_ERROR, &ret, &optlen);
-        if (ret != 0)
+        if (ret != 0) {
+            av_log(NULL, AV_LOG_ERROR,
+                   "TCP connection to %s:%d failed: %s\n",
+                   hostname, port, strerror(ret));
             goto fail;
+        }
     }
     s = av_malloc(sizeof(TCPContext));
     if (!s) {
@@ -144,7 +155,7 @@ static int tcp_read(URLContext *h, uint8_t *buf, int size)
             if (len < 0) {
                 if (ff_neterrno() != FF_NETERROR(EINTR) &&
                     ff_neterrno() != FF_NETERROR(EAGAIN))
-                    return AVERROR(ff_neterrno());
+                    return ff_neterrno();
             } else return len;
         } else if (ret < 0) {
             if (ff_neterrno() == FF_NETERROR(EINTR))
@@ -176,7 +187,7 @@ static int tcp_write(URLContext *h, const uint8_t *buf, int size)
             if (len < 0) {
                 if (ff_neterrno() != FF_NETERROR(EINTR) &&
                     ff_neterrno() != FF_NETERROR(EAGAIN))
-                    return AVERROR(ff_neterrno());
+                    return ff_neterrno();
                 continue;
             }
             size -= len;

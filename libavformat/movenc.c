@@ -755,8 +755,8 @@ static int mov_write_pasp_tag(ByteIOContext *pb, MOVTrack *track)
 
     put_be32(pb, 16);
     put_tag(pb, "pasp");
-    put_be32(pb, track->enc->sample_aspect_ratio.num);
-    put_be32(pb, track->enc->sample_aspect_ratio.den);
+    put_be32(pb, sar.num);
+    put_be32(pb, sar.den);
     return 16;
 }
 
@@ -1263,7 +1263,7 @@ static int mov_write_udta_sdp(ByteIOContext *pb, AVCodecContext *ctx, int index)
     char buf[1000] = "";
     int len;
 
-    ff_sdp_write_media(buf, sizeof(buf), ctx, NULL, 0, 0);
+    ff_sdp_write_media(buf, sizeof(buf), ctx, NULL, NULL, 0, 0);
     av_strlcatf(buf, sizeof(buf), "a=control:streamid=%d\r\n", index);
     len = strlen(buf);
 
@@ -1610,11 +1610,12 @@ static int mov_write_udta_tag(ByteIOContext *pb, MOVMuxContext *mov,
             mov_write_3gp_udta_tag(pb_buf, s, "cprt", "copyright");
             mov_write_3gp_udta_tag(pb_buf, s, "yrrc", "date");
         } else if (mov->mode == MODE_MOV) { // the title field breaks gtkpod with mp4 and my suspicion is that stuff is not valid in mp4
+            mov_write_string_metadata(s, pb_buf, "\251ART", "artist"     , 0);
             mov_write_string_metadata(s, pb_buf, "\251nam", "title"      , 0);
             mov_write_string_metadata(s, pb_buf, "\251aut", "author"     , 0);
             mov_write_string_metadata(s, pb_buf, "\251alb", "album"      , 0);
             mov_write_string_metadata(s, pb_buf, "\251day", "date"       , 0);
-            mov_write_string_tag(pb_buf, "\251enc", LIBAVFORMAT_IDENT, 0, 0);
+            mov_write_string_metadata(s, pb_buf, "\251swr", "encoder"    , 0);
             mov_write_string_metadata(s, pb_buf, "\251des", "comment"    , 0);
             mov_write_string_metadata(s, pb_buf, "\251gen", "genre"      , 0);
             mov_write_string_metadata(s, pb_buf, "\251cpy", "copyright"  , 0);
@@ -1630,8 +1631,8 @@ static int mov_write_udta_tag(ByteIOContext *pb, MOVMuxContext *mov,
         put_be32(pb, size+8);
         put_tag(pb, "udta");
         put_buffer(pb, buf, size);
-        av_free(buf);
     }
+    av_free(buf);
 
     return 0;
 }

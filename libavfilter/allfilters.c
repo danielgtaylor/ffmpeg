@@ -34,21 +34,39 @@ void avfilter_register_all(void)
         return;
     initialized = 1;
 
+    REGISTER_FILTER (ANULL,       anull,       af);
+
+    REGISTER_FILTER (ANULLSRC,    anullsrc,    asrc);
+
+    REGISTER_FILTER (ANULLSINK,   anullsink,   asink);
+
     REGISTER_FILTER (ASPECT,      aspect,      vf);
+    REGISTER_FILTER (BLACKFRAME,  blackframe,  vf);
     REGISTER_FILTER (CROP,        crop,        vf);
+    REGISTER_FILTER (CROPDETECT,  cropdetect,  vf);
+    REGISTER_FILTER (DRAWBOX,     drawbox,     vf);
+    REGISTER_FILTER (FIFO,        fifo,        vf);
     REGISTER_FILTER (FORMAT,      format,      vf);
+    REGISTER_FILTER (FREI0R,      frei0r,      vf);
+    REGISTER_FILTER (HFLIP,       hflip,       vf);
     REGISTER_FILTER (NOFORMAT,    noformat,    vf);
     REGISTER_FILTER (NULL,        null,        vf);
     REGISTER_FILTER (OVERLAY,     overlay,     vf);
+    REGISTER_FILTER (OCV_SMOOTH,  ocv_smooth,  vf);
     REGISTER_FILTER (PAD,         pad,         vf);
     REGISTER_FILTER (PIXDESCTEST, pixdesctest, vf);
     REGISTER_FILTER (PIXELASPECT, pixelaspect, vf);
     REGISTER_FILTER (SCALE,       scale,       vf);
+    REGISTER_FILTER (SETPTS,      setpts,      vf);
+    REGISTER_FILTER (SETTB,       settb,       vf);
     REGISTER_FILTER (SLICIFY,     slicify,     vf);
+    REGISTER_FILTER (TRANSPOSE,   transpose,   vf);
     REGISTER_FILTER (UNSHARP,     unsharp,     vf);
     REGISTER_FILTER (VFLIP,       vflip,       vf);
+    REGISTER_FILTER (YADIF,       yadif,       vf);
 
     REGISTER_FILTER (BUFFER,      buffer,      vsrc);
+    REGISTER_FILTER (COLOR,       color,       vsrc);
     REGISTER_FILTER (NULLSRC,     nullsrc,     vsrc);
     REGISTER_FILTER (MOVIE,       movie,       vsrc);
 

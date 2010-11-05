@@ -275,6 +275,9 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
                 type = AVMEDIA_TYPE_AUDIO;
             } else if (!guidcmp(&g, &ff_asf_video_stream)) {
                 type = AVMEDIA_TYPE_VIDEO;
+            } else if (!guidcmp(&g, &ff_asf_jfif_media)) {
+                type = AVMEDIA_TYPE_VIDEO;
+                st->codec->codec_id = CODEC_ID_MJPEG;
             } else if (!guidcmp(&g, &ff_asf_command_stream)) {
                 type = AVMEDIA_TYPE_DATA;
             } else if (!guidcmp(&g, &ff_asf_ext_stream_embed_stream_header)) {
@@ -358,7 +361,8 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
                     st->codec->frame_size = 1;
                     break;
                 }
-            } else if (type == AVMEDIA_TYPE_VIDEO) {
+            } else if (type == AVMEDIA_TYPE_VIDEO &&
+                       gsize - (url_ftell(pb) - pos1 + 24) >= 51) {
                 get_le32(pb);
                 get_le32(pb);
                 get_byte(pb);
@@ -463,7 +467,16 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
                     value_len  = get_le16(pb);
                     if (!value_type && value_len%2)
                         value_len += 1;
-                    get_tag(s, name, value_type, value_len);
+                    /**
+                     * My sample has that stream set to 0 maybe that mean the container.
+                     * Asf stream count start at 1. I am using 0 to the container value since it's unused
+                     */
+                    if (!strcmp(name, "AspectRatioX")){
+                        dar[0].num= get_value(s->pb, value_type);
+                    } else if(!strcmp(name, "AspectRatioY")){
+                        dar[0].den= get_value(s->pb, value_type);
+                    } else
+                        get_tag(s, name, value_type, value_len);
             }
         } else if (!guidcmp(&g, &ff_asf_metadata_header)) {
             int n, stream_num, name_len, value_len, value_type, value_num;
@@ -622,11 +635,16 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
             AVStream *st = s->streams[stream_num];
             if (!st->codec->bit_rate)
                 st->codec->bit_rate = bitrate[i];
-            if (dar[i].num > 0 && dar[i].den > 0)
+            if (dar[i].num > 0 && dar[i].den > 0){
                 av_reduce(&st->sample_aspect_ratio.num,
                           &st->sample_aspect_ratio.den,
                           dar[i].num, dar[i].den, INT_MAX);
-//av_log(s, AV_LOG_ERROR, "dar %d:%d sar=%d:%d\n", dar[i].num, dar[i].den, st->sample_aspect_ratio.num, st->sample_aspect_ratio.den);
+            } else if ((dar[0].num > 0) && (dar[0].den > 0) && (st->codec->codec_type==AVMEDIA_TYPE_VIDEO)) // Use ASF container value if the stream doesn't AR set.
+                av_reduce(&st->sample_aspect_ratio.num,
+                          &st->sample_aspect_ratio.den,
+                          dar[0].num, dar[0].den, INT_MAX);
+
+//av_log(s, AV_LOG_INFO, "i=%d, st->codec->codec_type:%d, dar %d:%d sar=%d:%d\n", i, st->codec->codec_type, dar[i].num, dar[i].den, st->sample_aspect_ratio.num, st->sample_aspect_ratio.den);
 
             // copy and convert language codes to the frontend
             if (asf->streams[i].stream_language_index < 128) {
@@ -640,6 +658,8 @@ static int asf_read_header(AVFormatContext *s, AVFormatParameters *ap)
             }
         }
     }
+
+    ff_metadata_conv(&s->metadata, NULL, ff_asf_metadata_conv);
 
     return 0;
 }
@@ -1217,5 +1237,4 @@ AVInputFormat asf_demuxer = {
     asf_read_close,
     asf_read_seek,
     asf_read_pts,
-    .metadata_conv = ff_asf_metadata_conv,
 };

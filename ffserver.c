@@ -36,6 +36,7 @@
 #include "libavutil/avstring.h"
 #include "libavutil/lfg.h"
 #include "libavutil/random_seed.h"
+#include "libavcore/parseutils.h"
 #include "libavcodec/opt.h"
 #include <stdarg.h>
 #include <unistd.h>
@@ -90,6 +91,10 @@ static const char *http_state[] = {
     "RTSP_SEND_REPLY",
     "RTSP_SEND_PACKET",
 };
+
+#if !FF_API_MAX_STREAMS
+#define MAX_STREAMS 20
+#endif
 
 #define IOBUFFER_INIT_SIZE 8192
 
@@ -2929,7 +2934,7 @@ static int prepare_sdp_description(FFStream *stream, uint8_t **pbuffer,
                                    struct in_addr my_ip)
 {
     AVFormatContext *avc;
-    AVStream avs[MAX_STREAMS];
+    AVStream *avs = NULL;
     int i;
 
     avc =  avformat_alloc_context();
@@ -2947,14 +2952,29 @@ static int prepare_sdp_description(FFStream *stream, uint8_t **pbuffer,
         snprintf(avc->filename, 1024, "rtp://0.0.0.0");
     }
 
+#if !FF_API_MAX_STREAMS
+    if (avc->nb_streams >= INT_MAX/sizeof(*avc->streams) ||
+        !(avc->streams = av_malloc(avc->nb_streams * sizeof(*avc->streams))))
+        goto sdp_done;
+#endif
+    if (avc->nb_streams >= INT_MAX/sizeof(*avs) ||
+        !(avs = av_malloc(avc->nb_streams * sizeof(*avs))))
+        goto sdp_done;
+
     for(i = 0; i < stream->nb_streams; i++) {
         avc->streams[i] = &avs[i];
         avc->streams[i]->codec = stream->streams[i]->codec;
     }
     *pbuffer = av_mallocz(2048);
     avf_sdp_create(&avc, 1, *pbuffer, 2048);
+
+ sdp_done:
+#if !FF_API_MAX_STREAMS
+    av_free(avc->streams);
+#endif
     av_metadata_free(&avc->metadata);
     av_free(avc);
+    av_free(avs);
 
     return strlen(*pbuffer);
 }
@@ -3952,27 +3972,11 @@ static int ffserver_opt_preset(const char *arg,
 {
     FILE *f=NULL;
     char filename[1000], tmp[1000], tmp2[1000], line[1000];
-    int i, ret = 0;
-    const char *base[3]= { getenv("FFMPEG_DATADIR"),
-                           getenv("HOME"),
-                           FFMPEG_DATADIR,
-                         };
+    int ret = 0;
+    AVCodec *codec = avcodec_find_encoder(avctx->codec_id);
 
-    for(i=0; i<3 && !f; i++){
-        if(!base[i])
-            continue;
-        snprintf(filename, sizeof(filename), "%s%s/%s.ffpreset", base[i], i != 1 ? "" : "/.ffmpeg", arg);
-        f= fopen(filename, "r");
-        if(!f){
-            AVCodec *codec = avcodec_find_encoder(avctx->codec_id);
-            if (codec) {
-                snprintf(filename, sizeof(filename), "%s%s/%s-%s.ffpreset", base[i],  i != 1 ? "" : "/.ffmpeg", codec->name, arg);
-                f= fopen(filename, "r");
-            }
-        }
-    }
-
-    if(!f){
+    if (!(f = get_preset_file(filename, sizeof(filename), arg, 0,
+                              codec ? codec->name : NULL))) {
         fprintf(stderr, "File for preset '%s' not found\n", arg);
         return 1;
     }
@@ -4410,7 +4414,7 @@ static int parse_ffconfig(const char *filename)
         } else if (!strcasecmp(cmd, "VideoSize")) {
             get_arg(arg, sizeof(arg), &p);
             if (stream) {
-                av_parse_video_frame_size(&video_enc.width, &video_enc.height, arg);
+                av_parse_video_size(&video_enc.width, &video_enc.height, arg);
                 if ((video_enc.width % 16) != 0 ||
                     (video_enc.height % 16) != 0) {
                     ERROR("Image size must be a multiple of 16\n");
@@ -4420,7 +4424,7 @@ static int parse_ffconfig(const char *filename)
             get_arg(arg, sizeof(arg), &p);
             if (stream) {
                 AVRational frame_rate;
-                if (av_parse_video_frame_rate(&frame_rate, arg) < 0) {
+                if (av_parse_video_rate(&frame_rate, arg) < 0) {
                     ERROR("Incorrect frame rate: %s\n", arg);
                 } else {
                     video_enc.time_base.num = frame_rate.den;

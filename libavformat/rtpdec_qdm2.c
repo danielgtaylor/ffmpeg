@@ -30,7 +30,7 @@
 #include "libavcodec/avcodec.h"
 #include "rtp.h"
 #include "rtpdec.h"
-#include "rtpdec_qdm2.h"
+#include "rtpdec_formats.h"
 
 struct PayloadContext {
     /** values read from the config header, used as packet headers */
@@ -307,7 +307,7 @@ static void qdm2_extradata_free(PayloadContext *qdm)
 
 RTPDynamicProtocolHandler ff_qdm2_dynamic_handler = {
     "X-QDM",
-    CODEC_TYPE_AUDIO,
+    AVMEDIA_TYPE_AUDIO,
     CODEC_ID_NONE,
     NULL,
     qdm2_extradata_new,

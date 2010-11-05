@@ -27,11 +27,16 @@
 #include <stdint.h>
 #include "avcodec.h"
 
+#if LIBAVCODEC_VERSION_MAJOR < 53
+attribute_deprecated
 int ff_fill_linesize(AVPicture *picture, enum PixelFormat pix_fmt, int width);
 
+attribute_deprecated
 int ff_fill_pointer(AVPicture *picture, uint8_t *ptr, enum PixelFormat pix_fmt, int height);
 
+attribute_deprecated
 int ff_get_plane_bytewidth(enum PixelFormat pix_fmt, int width, int plane);
+#endif
 
 int ff_set_systematic_pal(uint32_t pal[256], enum PixelFormat pix_fmt);
 

@@ -52,6 +52,7 @@
 #include "acelp_vectors.h"
 #include "acelp_pitch_delay.h"
 #include "lsp.h"
+#include "amr.h"
 
 #include "amrnbdata.h"
 
@@ -195,24 +196,9 @@ static enum Mode unpack_bitstream(AMRContext *p, const uint8_t *buf,
     p->bad_frame_indicator = !get_bits1(&gb); // quality bit
     skip_bits(&gb, 2);                        // two padding bits
 
-    if (mode < MODE_DTX) {
-        uint16_t *data = (uint16_t *)&p->frame;
-        const uint8_t *order = amr_unpacking_bitmaps_per_mode[mode];
-        int field_size;
-
-        memset(&p->frame, 0, sizeof(AMRNBFrame));
-        buf++;
-        while ((field_size = *order++)) {
-            int field = 0;
-            int field_offset = *order++;
-            while (field_size--) {
-               int bit = *order++;
-               field <<= 1;
-               field |= buf[bit >> 3] >> (bit & 7) & 1;
-            }
-            data[field_offset] = field;
-        }
-    }
+    if (mode < MODE_DTX)
+        ff_amr_bit_reorder((uint16_t *) &p->frame, sizeof(AMRNBFrame), buf + 1,
+                           amr_unpacking_bitmaps_per_mode[mode]);
 
     return mode;
 }
@@ -220,20 +206,6 @@ static enum Mode unpack_bitstream(AMRContext *p, const uint8_t *buf,
 
 /// @defgroup amr_lpc_decoding AMR pitch LPC coefficient decoding functions
 /// @{
-
-/**
- * Convert an lsf vector into an lsp vector.
- *
- * @param lsf               input lsf vector
- * @param lsp               output lsp vector
- */
-static void lsf2lsp(const float *lsf, double *lsp)
-{
-    int i;
-
-    for (i = 0; i < LP_FILTER_ORDER; i++)
-        lsp[i] = cos(2.0 * M_PI * lsf[i]);
-}
 
 /**
  * Interpolate the LSF vector (used for fixed gain smoothing).
@@ -293,7 +265,7 @@ static void lsf2lsp_for_mode12k2(AMRContext *p, double lsp[LP_FILTER_ORDER],
     if (update)
         interpolate_lsf(p->lsf_q, lsf_q);
 
-    lsf2lsp(lsf_q, lsp);
+    ff_acelp_lsf2lspd(lsp, lsf_q, LP_FILTER_ORDER);
 }
 
 /**
@@ -357,7 +329,7 @@ static void lsf2lsp_3(AMRContext *p)
     interpolate_lsf(p->lsf_q, lsf_q);
     memcpy(p->prev_lsf_r, lsf_r, LP_FILTER_ORDER * sizeof(*lsf_r));
 
-    lsf2lsp(lsf_q, p->lsp[3]);
+    ff_acelp_lsf2lspd(p->lsp[3], lsf_q, LP_FILTER_ORDER);
 
     // interpolate LSP vectors at subframes 1, 2 and 3
     for (i = 1; i <= 3; i++)

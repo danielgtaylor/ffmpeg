@@ -53,6 +53,10 @@ static int is_supported(enum CodecID id)
     case CODEC_ID_MPEG2TS:
     case CODEC_ID_AMR_NB:
     case CODEC_ID_AMR_WB:
+    case CODEC_ID_VORBIS:
+    case CODEC_ID_THEORA:
+    case CODEC_ID_VP8:
+    case CODEC_ID_ADPCM_G722:
         return 1;
     default:
         return 0;
@@ -135,6 +139,21 @@ static int rtp_write_header(AVFormatContext *s1)
             s->nal_length_size = (st->codec->extradata[4] & 0x03) + 1;
         }
         break;
+    case CODEC_ID_VORBIS:
+    case CODEC_ID_THEORA:
+        if (!s->max_frames_per_packet) s->max_frames_per_packet = 15;
+        s->max_frames_per_packet = av_clip(s->max_frames_per_packet, 1, 15);
+        s->max_payload_size -= 6; // ident+frag+tdt/vdt+pkt_num+pkt_length
+        s->num_frames = 0;
+        goto defaultcase;
+    case CODEC_ID_VP8:
+        av_log(s1, AV_LOG_WARNING, "RTP VP8 payload is still experimental\n");
+        break;
+    case CODEC_ID_ADPCM_G722:
+        /* Due to a historical error, the clock rate for G722 in RTP is
+         * 8000, even if the sample rate is 16000. See RFC 3551. */
+        av_set_pts_info(st, 32, 1, 8000);
+        break;
     case CODEC_ID_AMR_NB:
     case CODEC_ID_AMR_WB:
         if (!s->max_frames_per_packet)
@@ -155,6 +174,7 @@ static int rtp_write_header(AVFormatContext *s1)
     case CODEC_ID_AAC:
         s->num_frames = 0;
     default:
+defaultcase:
         if (st->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
             av_set_pts_info(st, 32, 1, st->codec->sample_rate);
         }
@@ -177,7 +197,7 @@ static void rtcp_send_sr(AVFormatContext *s1, int64_t ntp_time)
     rtp_ts = av_rescale_q(ntp_time - s->first_rtcp_ntp_time, (AVRational){1, 1000000},
                           s1->streams[0]->time_base) + s->base_timestamp;
     put_byte(s1->pb, (RTP_VERSION << 6));
-    put_byte(s1->pb, 200);
+    put_byte(s1->pb, RTCP_SR);
     put_be16(s1->pb, 6); /* length in words - 1 */
     put_be32(s1->pb, s->ssrc);
     put_be32(s1->pb, ntp_time / 1000000);
@@ -368,6 +388,12 @@ static int rtp_write_packet(AVFormatContext *s1, AVPacket *pkt)
     case CODEC_ID_PCM_S16LE:
         rtp_send_samples(s1, pkt->data, size, 2 * st->codec->channels);
         break;
+    case CODEC_ID_ADPCM_G722:
+        /* The actual sample size is half a byte per sample, but since the
+         * stream clock rate is 8000 Hz while the sample rate is 16000 Hz,
+         * the correct parameter for send_samples is 1 byte per stream clock. */
+        rtp_send_samples(s1, pkt->data, size, 1 * st->codec->channels);
+        break;
     case CODEC_ID_MP2:
     case CODEC_ID_MP3:
         rtp_send_mpegaudio(s1, pkt->data, size);
@@ -392,6 +418,13 @@ static int rtp_write_packet(AVFormatContext *s1, AVPacket *pkt)
     case CODEC_ID_H263:
     case CODEC_ID_H263P:
         ff_rtp_send_h263(s1, pkt->data, size);
+        break;
+    case CODEC_ID_VORBIS:
+    case CODEC_ID_THEORA:
+        ff_rtp_send_xiph(s1, pkt->data, size);
+        break;
+    case CODEC_ID_VP8:
+        ff_rtp_send_vp8(s1, pkt->data, size);
         break;
     default:
         /* better than nothing : send the codec raw data */

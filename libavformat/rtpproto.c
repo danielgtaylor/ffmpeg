@@ -210,7 +210,7 @@ static int rtp_open(URLContext *h, const char *uri, int flags)
 static int rtp_read(URLContext *h, uint8_t *buf, int size)
 {
     RTPContext *s = h->priv_data;
-    struct sockaddr_in from;
+    struct sockaddr_storage from;
     socklen_t from_len;
     int len, fd_max, n;
     fd_set rfds;
@@ -285,7 +285,7 @@ static int rtp_write(URLContext *h, const uint8_t *buf, int size)
     int ret;
     URLContext *hd;
 
-    if (buf[1] >= 200 && buf[1] <= 204) {
+    if (buf[1] >= RTCP_SR && buf[1] <= RTCP_APP) {
         /* RTCP payload type */
         hd = s->rtcp_hd;
     } else {
@@ -328,18 +328,6 @@ int rtp_get_local_rtp_port(URLContext *h)
 }
 
 /**
- * Return the local rtp port used by the RTP connection
- * @param h media file context
- * @return the local port number
- */
-
-int rtp_get_local_port(URLContext *h)
-{
-    RTPContext *s = h->priv_data;
-    return udp_get_local_port(s->rtp_hd);
-}
-
-/**
  * Return the local rtcp port used by the RTP connection
  * @param h media file context
  * @return the local port number
@@ -351,26 +339,15 @@ int rtp_get_local_rtcp_port(URLContext *h)
     return udp_get_local_port(s->rtcp_hd);
 }
 
-#if (LIBAVFORMAT_VERSION_MAJOR <= 52)
-/**
- * Return the rtp and rtcp file handles for select() usage to wait for
- * several RTP streams at the same time.
- * @param h media file context
- */
-
-void rtp_get_file_handles(URLContext *h, int *prtp_fd, int *prtcp_fd)
-{
-    RTPContext *s = h->priv_data;
-
-    *prtp_fd = s->rtp_fd;
-    *prtcp_fd = s->rtcp_fd;
-}
-#endif
-
 static int rtp_get_file_handle(URLContext *h)
 {
     RTPContext *s = h->priv_data;
     return s->rtp_fd;
+}
+
+int rtp_get_rtcp_file_handle(URLContext *h) {
+    RTPContext *s = h->priv_data;
+    return s->rtcp_fd;
 }
 
 URLProtocol rtp_protocol = {

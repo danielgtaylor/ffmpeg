@@ -42,9 +42,6 @@ static int mp3_read_probe(AVProbeData *p)
     AVCodecContext avctx;
 
     buf0 = p->buf;
-    if(ff_id3v2_match(buf0, ID3v2_DEFAULT_MAGIC)) {
-        buf0 += ff_id3v2_tag_len(buf0);
-    }
     end = p->buf + p->buf_size - sizeof(uint32_t);
     while(buf0 < end && !*buf0)
         buf0++;
@@ -83,7 +80,8 @@ static int mp3_read_probe(AVProbeData *p)
 static int mp3_parse_vbr_tags(AVFormatContext *s, AVStream *st, int64_t base)
 {
     uint32_t v, spf;
-    int frames = -1; /* Total number of frames in file */
+    unsigned frames = 0; /* Total number of frames in file */
+    unsigned size = 0; /* Total number of bytes in the stream */
     const int64_t xing_offtbl[2][2] = {{32, 17}, {17,9}};
     MPADecodeHeader c;
     int vbrtag_size = 0;
@@ -104,6 +102,8 @@ static int mp3_parse_vbr_tags(AVFormatContext *s, AVStream *st, int64_t base)
         v = get_be32(s->pb);
         if(v & 0x1)
             frames = get_be32(s->pb);
+        if(v & 0x2)
+            size = get_be32(s->pb);
     }
 
     /* Check for VBRI tag (always 32 bytes after end of mpegaudio header) */
@@ -112,21 +112,26 @@ static int mp3_parse_vbr_tags(AVFormatContext *s, AVStream *st, int64_t base)
     if(v == MKBETAG('V', 'B', 'R', 'I')) {
         /* Check tag version */
         if(get_be16(s->pb) == 1) {
-            /* skip delay, quality and total bytes */
-            url_fseek(s->pb, 8, SEEK_CUR);
+            /* skip delay and quality */
+            url_fseek(s->pb, 4, SEEK_CUR);
             frames = get_be32(s->pb);
+            size = get_be32(s->pb);
         }
     }
 
-    if(frames < 0)
+    if(!frames && !size)
         return -1;
 
     /* Skip the vbr tag frame */
     url_fseek(s->pb, base + vbrtag_size, SEEK_SET);
 
     spf = c.lsf ? 576 : 1152; /* Samples per frame, layer 3 */
-    st->duration = av_rescale_q(frames, (AVRational){spf, c.sample_rate},
-                                st->time_base);
+    if(frames)
+        st->duration = av_rescale_q(frames, (AVRational){spf, c.sample_rate},
+                                    st->time_base);
+    if(size)
+        st->codec->bit_rate = av_rescale(size, 8 * c.sample_rate, frames * (int64_t)spf);
+
     return 0;
 }
 
@@ -148,7 +153,6 @@ static int mp3_read_header(AVFormatContext *s,
     // lcm of all mp3 sample rates
     av_set_pts_info(st, 64, 1, 14112000);
 
-    ff_id3v2_read(s, ID3v2_DEFAULT_MAGIC);
     off = url_ftell(s->pb);
 
     if (!av_metadata_get(s->metadata, "", NULL, AV_METADATA_IGNORE_SUFFIX))
@@ -191,7 +195,6 @@ AVInputFormat mp3_demuxer = {
     mp3_read_packet,
     .flags= AVFMT_GENERIC_INDEX,
     .extensions = "mp2,mp3,m2a", /* XXX: use probe */
-    .metadata_conv = ff_id3v2_metadata_conv,
 };
 #endif
 
@@ -290,7 +293,6 @@ AVOutputFormat mp2_muxer = {
     NULL,
     mp3_write_packet,
     mp3_write_trailer,
-    .metadata_conv = ff_id3v2_metadata_conv,
 };
 #endif
 
@@ -313,6 +315,7 @@ static int mp3_write_header(struct AVFormatContext *s)
     size_pos = url_ftell(s->pb);
     put_be32(s->pb, 0);
 
+    ff_metadata_conv(&s->metadata, ff_id3v2_metadata_conv, NULL);
     while ((t = av_metadata_get(s->metadata, "", t, AV_METADATA_IGNORE_SUFFIX))) {
         uint32_t tag = 0;
 
@@ -362,6 +365,5 @@ AVOutputFormat mp3_muxer = {
     mp3_write_packet,
     mp3_write_trailer,
     AVFMT_NOTIMESTAMPS,
-    .metadata_conv = ff_id3v2_metadata_conv,
 };
 #endif

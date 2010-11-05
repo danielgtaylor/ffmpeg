@@ -66,9 +66,12 @@ void avcodec_register_all(void)
     REGISTER_HWACCEL (WMV3_VAAPI, wmv3_vaapi);
 
     /* video codecs */
+    REGISTER_ENCODER (A64MULTI, a64multi);
+    REGISTER_ENCODER (A64MULTI5, a64multi5);
     REGISTER_DECODER (AASC, aasc);
     REGISTER_DECODER (AMV, amv);
     REGISTER_DECODER (ANM, anm);
+    REGISTER_DECODER (ANSI, ansi);
     REGISTER_ENCDEC  (ASV1, asv1);
     REGISTER_ENCDEC  (ASV2, asv2);
     REGISTER_DECODER (AURA, aura);
@@ -160,6 +163,7 @@ void avcodec_register_all(void)
     REGISTER_DECODER (QDRAW, qdraw);
     REGISTER_DECODER (QPEG, qpeg);
     REGISTER_ENCDEC  (QTRLE, qtrle);
+    REGISTER_DECODER (R10K,  r10k);
     REGISTER_DECODER (R210,  r210);
     REGISTER_ENCDEC  (RAWVIDEO, rawvideo);
     REGISTER_DECODER (RL2, rl2);
@@ -216,6 +220,7 @@ void avcodec_register_all(void)
 
     /* audio codecs */
     REGISTER_ENCDEC  (AAC, aac);
+    REGISTER_DECODER (AAC_LATM, aac_latm);
     REGISTER_ENCDEC  (AC3, ac3);
     REGISTER_ENCDEC  (ALAC, alac);
     REGISTER_DECODER (ALS, als);
@@ -279,6 +284,7 @@ void avcodec_register_all(void)
     REGISTER_ENCDEC  (PCM_F32LE, pcm_f32le);
     REGISTER_ENCDEC  (PCM_F64BE, pcm_f64be);
     REGISTER_ENCDEC  (PCM_F64LE, pcm_f64le);
+    REGISTER_DECODER (PCM_LXF, pcm_lxf);
     REGISTER_ENCDEC  (PCM_MULAW, pcm_mulaw);
     REGISTER_ENCDEC  (PCM_S8, pcm_s8);
     REGISTER_ENCDEC  (PCM_S16BE, pcm_s16be);
@@ -314,6 +320,7 @@ void avcodec_register_all(void)
     REGISTER_DECODER (ADPCM_EA_R2, adpcm_ea_r2);
     REGISTER_DECODER (ADPCM_EA_R3, adpcm_ea_r3);
     REGISTER_DECODER (ADPCM_EA_XAS, adpcm_ea_xas);
+    REGISTER_ENCDEC  (ADPCM_G722, adpcm_g722);
     REGISTER_ENCDEC  (ADPCM_G726, adpcm_g726);
     REGISTER_DECODER (ADPCM_IMA_AMV, adpcm_ima_amv);
     REGISTER_DECODER (ADPCM_IMA_DK3, adpcm_ima_dk3);
@@ -355,10 +362,12 @@ void avcodec_register_all(void)
     REGISTER_ENCODER (LIBVORBIS, libvorbis);
     REGISTER_ENCDEC  (LIBVPX, libvpx);
     REGISTER_ENCODER (LIBX264, libx264);
+    REGISTER_ENCODER (LIBXAVS, libxavs);
     REGISTER_ENCODER (LIBXVID, libxvid);
 
     /* parsers */
     REGISTER_PARSER  (AAC, aac);
+    REGISTER_PARSER  (AAC_LATM, aac_latm);
     REGISTER_PARSER  (AC3, ac3);
     REGISTER_PARSER  (CAVSVIDEO, cavsvideo);
     REGISTER_PARSER  (DCA, dca);

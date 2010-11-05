@@ -61,8 +61,8 @@ typedef struct vorbis_floor0_s vorbis_floor0;
 typedef struct vorbis_floor1_s vorbis_floor1;
 struct vorbis_context_s;
 typedef
-uint_fast8_t (* vorbis_floor_decode_func)
-             (struct vorbis_context_s *, vorbis_floor_data *, float *);
+int (* vorbis_floor_decode_func)
+    (struct vorbis_context_s *, vorbis_floor_data *, float *);
 typedef struct {
     uint_fast8_t floor_type;
     vorbis_floor_decode_func decode;
@@ -81,7 +81,7 @@ typedef struct {
         } t0;
         struct vorbis_floor1_s {
             uint_fast8_t partitions;
-            uint_fast8_t partition_class[32];
+            uint8_t      partition_class[32];
             uint_fast8_t class_dimensions[16];
             uint_fast8_t class_subclasses[16];
             uint_fast8_t class_masterbook[16];
@@ -97,13 +97,13 @@ typedef struct {
     uint_fast16_t type;
     uint_fast32_t begin;
     uint_fast32_t end;
-    uint_fast32_t partition_size;
+    unsigned      partition_size;
     uint_fast8_t  classifications;
     uint_fast8_t  classbook;
     int_fast16_t  books[64][8];
     uint_fast8_t  maxpass;
     uint_fast16_t ptns_to_read;
-    uint_fast8_t *classifs;
+    uint8_t *classifs;
 } vorbis_residue;
 
 typedef struct {
@@ -459,15 +459,15 @@ static int vorbis_parse_setup_hdr_tdtransforms(vorbis_context *vc)
 
 // Process floors part
 
-static uint_fast8_t vorbis_floor0_decode(vorbis_context *vc,
-                                         vorbis_floor_data *vfu, float *vec);
+static int vorbis_floor0_decode(vorbis_context *vc,
+                                vorbis_floor_data *vfu, float *vec);
 static void create_map(vorbis_context *vc, uint_fast8_t floor_number);
-static uint_fast8_t vorbis_floor1_decode(vorbis_context *vc,
-                                         vorbis_floor_data *vfu, float *vec);
+static int vorbis_floor1_decode(vorbis_context *vc,
+                                vorbis_floor_data *vfu, float *vec);
 static int vorbis_parse_setup_hdr_floors(vorbis_context *vc)
 {
     GetBitContext *gb = &vc->gb;
-    uint_fast16_t i,j,k;
+    int i,j,k;
 
     vc->floor_count = get_bits(gb, 6) + 1;
 
@@ -655,7 +655,7 @@ static int vorbis_parse_setup_hdr_residues(vorbis_context *vc)
         if (res_setup->begin>res_setup->end ||
             res_setup->end > vc->avccontext->channels * vc->blocksize[1] / (res_setup->type == 2 ? 1 : 2) ||
             (res_setup->end-res_setup->begin) / res_setup->partition_size > V_MAX_PARTITIONS) {
-            av_log(vc->avccontext, AV_LOG_ERROR, "partition out of bounds: type, begin, end, size, blocksize: %"PRIdFAST16", %"PRIdFAST32", %"PRIdFAST32", %"PRIdFAST32", %"PRIdFAST32"\n", res_setup->type, res_setup->begin, res_setup->end, res_setup->partition_size, vc->blocksize[1] / 2);
+            av_log(vc->avccontext, AV_LOG_ERROR, "partition out of bounds: type, begin, end, size, blocksize: %"PRIdFAST16", %"PRIdFAST32", %"PRIdFAST32", %u, %"PRIdFAST32"\n", res_setup->type, res_setup->begin, res_setup->end, res_setup->partition_size, vc->blocksize[1] / 2);
             return -1;
         }
 
@@ -667,6 +667,8 @@ static int vorbis_parse_setup_hdr_residues(vorbis_context *vc)
         res_setup->classifs = av_malloc(res_setup->ptns_to_read *
                                         vc->audio_channels *
                                         sizeof(*res_setup->classifs));
+        if (!res_setup->classifs)
+            return AVERROR(ENOMEM);
 
         AV_DEBUG("    begin %d end %d part.size %d classif.s %d classbook %d \n", res_setup->begin, res_setup->end, res_setup->partition_size,
           res_setup->classifications, res_setup->classbook);
@@ -1013,8 +1015,8 @@ static av_cold int vorbis_decode_init(AVCodecContext *avccontext)
 
 // Read and decode floor
 
-static uint_fast8_t vorbis_floor0_decode(vorbis_context *vc,
-                                         vorbis_floor_data *vfu, float *vec)
+static int vorbis_floor0_decode(vorbis_context *vc,
+                                vorbis_floor_data *vfu, float *vec)
 {
     vorbis_floor0 *vf = &vfu->t0;
     float *lsp = vf->lsp;
@@ -1038,6 +1040,9 @@ static uint_fast8_t vorbis_floor0_decode(vorbis_context *vc,
         }
         AV_DEBUG("floor0 dec: booknumber: %u\n", book_idx);
         codebook = vc->codebooks[vf->book_list[book_idx]];
+        /* Invalid codebook! */
+        if (!codebook.codevectors)
+            return -1;
 
         while (lsp_len<vf->order) {
             int vec_off;
@@ -1123,8 +1128,8 @@ static uint_fast8_t vorbis_floor0_decode(vorbis_context *vc,
     return 0;
 }
 
-static uint_fast8_t vorbis_floor1_decode(vorbis_context *vc,
-                                         vorbis_floor_data *vfu, float *vec)
+static int vorbis_floor1_decode(vorbis_context *vc,
+                                vorbis_floor_data *vfu, float *vec)
 {
     vorbis_floor1 *vf = &vfu->t1;
     GetBitContext *gb = &vc->gb;
@@ -1267,7 +1272,7 @@ static av_always_inline int vorbis_residue_decode_internal(vorbis_context *vc,
     GetBitContext *gb = &vc->gb;
     uint_fast8_t c_p_c = vc->codebooks[vr->classbook].dimensions;
     uint_fast16_t ptns_to_read = vr->ptns_to_read;
-    uint_fast8_t *classifs = vr->classifs;
+    uint8_t *classifs = vr->classifs;
     uint_fast8_t pass;
     uint_fast8_t ch_used;
     uint_fast8_t i,j,l;
@@ -1500,13 +1505,20 @@ static int vorbis_parse_audio_packet(vorbis_context *vc)
 
     for (i = 0; i < vc->audio_channels; ++i) {
         vorbis_floor *floor;
+        int ret;
         if (mapping->submaps > 1) {
             floor = &vc->floors[mapping->submap_floor[mapping->mux[i]]];
         } else {
             floor = &vc->floors[mapping->submap_floor[0]];
         }
 
-        no_residue[i] = floor->decode(vc, &floor->data, ch_floor_ptr);
+        ret = floor->decode(vc, &floor->data, ch_floor_ptr);
+
+        if (ret < 0) {
+            av_log(vc->avccontext, AV_LOG_ERROR, "Invalid codebook in vorbis_floor_decode.\n");
+            return -1;
+        }
+        no_residue[i] = ret;
         ch_floor_ptr += blocksize / 2;
     }
 

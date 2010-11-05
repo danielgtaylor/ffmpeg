@@ -213,9 +213,10 @@ static av_cold int aac_encode_init(AVCodecContext *avctx)
 }
 
 static void apply_window_and_mdct(AVCodecContext *avctx, AACEncContext *s,
-                                  SingleChannelElement *sce, short *audio, int channel)
+                                  SingleChannelElement *sce, short *audio)
 {
-    int i, j, k;
+    int i, k;
+    const int chans = avctx->channels;
     const float * lwindow = sce->ics.use_kb_window[0] ? ff_aac_kbd_long_1024 : ff_sine_1024;
     const float * swindow = sce->ics.use_kb_window[0] ? ff_aac_kbd_short_128 : ff_sine_128;
     const float * pwindow = sce->ics.use_kb_window[1] ? ff_aac_kbd_short_128 : ff_sine_128;
@@ -230,18 +231,18 @@ static void apply_window_and_mdct(AVCodecContext *avctx, AACEncContext *s,
                 s->output[i] = sce->saved[i];
         }
         if (sce->ics.window_sequence[0] != LONG_START_SEQUENCE) {
-            for (i = 0, j = channel; i < 1024; i++, j += avctx->channels) {
-                s->output[i+1024]         = audio[j] * lwindow[1024 - i - 1];
-                sce->saved[i] = audio[j] * lwindow[i];
+            for (i = 0; i < 1024; i++) {
+                s->output[i+1024]         = audio[i * chans] * lwindow[1024 - i - 1];
+                sce->saved[i] = audio[i * chans] * lwindow[i];
             }
         } else {
-            for (i = 0, j = channel; i < 448; i++, j += avctx->channels)
-                s->output[i+1024]         = audio[j];
-            for (; i < 576; i++, j += avctx->channels)
-                s->output[i+1024]         = audio[j] * swindow[576 - i - 1];
+            for (i = 0; i < 448; i++)
+                s->output[i+1024]         = audio[i * chans];
+            for (; i < 576; i++)
+                s->output[i+1024]         = audio[i * chans] * swindow[576 - i - 1];
             memset(s->output+1024+576, 0, sizeof(s->output[0]) * 448);
-            for (i = 0, j = channel; i < 1024; i++, j += avctx->channels)
-                sce->saved[i] = audio[j];
+            for (i = 0; i < 1024; i++)
+                sce->saved[i] = audio[i * chans];
         }
         ff_mdct_calc(&s->mdct1024, sce->coeffs, s->output);
     } else {
@@ -249,13 +250,13 @@ static void apply_window_and_mdct(AVCodecContext *avctx, AACEncContext *s,
             for (i = 448 + k; i < 448 + k + 256; i++)
                 s->output[i - 448 - k] = (i < 1024)
                                          ? sce->saved[i]
-                                         : audio[channel + (i-1024)*avctx->channels];
+                                         : audio[(i-1024)*chans];
             s->dsp.vector_fmul        (s->output,     k ?  swindow : pwindow, 128);
             s->dsp.vector_fmul_reverse(s->output+128, s->output+128, swindow, 128);
             ff_mdct_calc(&s->mdct128, sce->coeffs + k, s->output);
         }
-        for (i = 0, j = channel; i < 1024; i++, j += avctx->channels)
-            sce->saved[i] = audio[j];
+        for (i = 0; i < 1024; i++)
+            sce->saved[i] = audio[i * chans];
     }
 }
 
@@ -301,7 +302,7 @@ static void encode_ms_info(PutBitContext *pb, ChannelElement *cpe)
 static void adjust_frame_information(AACEncContext *apc, ChannelElement *cpe, int chans)
 {
     int i, w, w2, g, ch;
-    int start, sum, maxsfb, cmaxsfb;
+    int start, maxsfb, cmaxsfb;
 
     for (ch = 0; ch < chans; ch++) {
         IndividualChannelStream *ics = &cpe->ch[ch].ics;
@@ -310,9 +311,8 @@ static void adjust_frame_information(AACEncContext *apc, ChannelElement *cpe, in
         cpe->ch[ch].pulse.num_pulse = 0;
         for (w = 0; w < ics->num_windows*16; w += 16) {
             for (g = 0; g < ics->num_swb; g++) {
-                sum = 0;
                 //apply M/S
-                if (!ch && cpe->ms_mask[w + g]) {
+                if (cpe->common_window && !ch && cpe->ms_mask[w + g]) {
                     for (i = 0; i < ics->swb_sizes[g]; i++) {
                         cpe->ch[0].coeffs[start+i] = (cpe->ch[0].coeffs[start+i] + cpe->ch[1].coeffs[start+i]) / 2.0;
                         cpe->ch[1].coeffs[start+i] =  cpe->ch[0].coeffs[start+i] - cpe->ch[1].coeffs[start+i];
@@ -516,20 +516,21 @@ static int aac_encode_frame(AVCodecContext *avctx,
         tag      = chan_map[i+1];
         chans    = tag == TYPE_CPE ? 2 : 1;
         cpe      = &s->cpe[i];
-        samples2 = samples + start_ch;
-        la       = samples2 + (448+64) * avctx->channels + start_ch;
-        if (!data)
-            la = NULL;
         for (j = 0; j < chans; j++) {
             IndividualChannelStream *ics = &cpe->ch[j].ics;
             int k;
+            int cur_channel = start_ch + j;
+            samples2 = samples + cur_channel;
+            la       = samples2 + (448+64) * avctx->channels;
+            if (!data)
+                la = NULL;
             if (tag == TYPE_LFE) {
                 wi[j].window_type[0] = ONLY_LONG_SEQUENCE;
                 wi[j].window_shape   = 0;
                 wi[j].num_windows    = 1;
                 wi[j].grouping[0]    = 1;
             } else {
-                wi[j] = ff_psy_suggest_window(&s->psy, samples2, la, start_ch + j,
+                wi[j] = ff_psy_suggest_window(&s->psy, samples2, la, cur_channel,
                                               ics->window_sequence[0]);
             }
             ics->window_sequence[1] = ics->window_sequence[0];
@@ -542,8 +543,7 @@ static int aac_encode_frame(AVCodecContext *avctx,
             for (k = 0; k < ics->num_windows; k++)
                 ics->group_len[k] = wi[j].grouping[k];
 
-            s->cur_channel = start_ch + j;
-            apply_window_and_mdct(avctx, s, &cpe->ch[j], samples2, j);
+            apply_window_and_mdct(avctx, s, &cpe->ch[j], samples2);
         }
         start_ch += chans;
     }
@@ -559,6 +559,8 @@ static int aac_encode_frame(AVCodecContext *avctx,
             tag      = chan_map[i+1];
             chans    = tag == TYPE_CPE ? 2 : 1;
             cpe      = &s->cpe[i];
+            put_bits(&s->pb, 3, tag);
+            put_bits(&s->pb, 4, chan_el_counter[tag]++);
             for (j = 0; j < chans; j++) {
                 s->cur_channel = start_ch + j;
                 ff_psy_set_band_info(&s->psy, s->cur_channel, cpe->ch[j].coeffs, &wi[j]);
@@ -581,8 +583,6 @@ static int aac_encode_frame(AVCodecContext *avctx,
             if (cpe->common_window && s->coder->search_for_ms)
                 s->coder->search_for_ms(s, cpe, s->lambda);
             adjust_frame_information(s, cpe, chans);
-            put_bits(&s->pb, 3, tag);
-            put_bits(&s->pb, 4, chan_el_counter[tag]++);
             if (chans == 2) {
                 put_bits(&s->pb, 1, cpe->common_window);
                 if (cpe->common_window) {

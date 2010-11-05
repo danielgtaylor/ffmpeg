@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "libavcore/imgutils.h"
 #include "avcodec.h"
 #include "dsputil.h"
 #include "binkdata.h"
@@ -324,7 +325,7 @@ static int read_motion_values(AVCodecContext *avctx, GetBitContext *gb, Bundle *
     return 0;
 }
 
-const uint8_t bink_rlelens[4] = { 4, 8, 12, 32 };
+static const uint8_t bink_rlelens[4] = { 4, 8, 12, 32 };
 
 static int read_block_types(AVCodecContext *avctx, GetBitContext *gb, Bundle *b)
 {
@@ -971,7 +972,7 @@ static av_cold int decode_init(AVCodecContext *avctx)
 
     c->pic.data[0] = NULL;
 
-    if (avcodec_check_dimensions(avctx, avctx->width, avctx->height) < 0) {
+    if (av_image_check_size(avctx->width, avctx->height, 0, avctx) < 0) {
         return 1;
     }
 

@@ -29,6 +29,7 @@
 #include "libavcodec/bytestream.h"
 #include "avformat.h"
 #include "oggdec.h"
+#include "vorbiscomment.h"
 
 static int ogm_chapter(AVFormatContext *as, uint8_t *key, uint8_t *val)
 {
@@ -137,6 +138,8 @@ ff_vorbis_comment(AVFormatContext * as, AVMetadata **m, const uint8_t *buf, int 
         av_log(as, AV_LOG_INFO,
                "truncated comment header, %i comments not found\n", n);
 
+    ff_metadata_conv(m, NULL, ff_vorbiscomment_metadata_conv);
+
     return 0;
 }
 
@@ -206,6 +209,12 @@ vorbis_header (AVFormatContext * s, int idx)
         return -1;
 
     priv = os->private;
+
+    if (priv->packet[pkt_type>>1])
+        return -1;
+    if (pkt_type > 1 && !priv->packet[0] || pkt_type > 3 && !priv->packet[1])
+        return -1;
+
     priv->len[pkt_type >> 1] = os->psize;
     priv->packet[pkt_type >> 1] = av_mallocz(os->psize);
     memcpy(priv->packet[pkt_type >> 1], os->buf + os->pstart, os->psize);

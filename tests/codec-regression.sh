@@ -248,6 +248,11 @@ do_video_encoding roqav.roq "" "-vframes 5"
 do_video_decoding "" "-pix_fmt yuv420p"
 fi
 
+if [ -n "$do_qtrle" ] ; then
+do_video_encoding qtrle.mov "" ""
+do_video_decoding "" ""
+fi
+
 if [ -n "$do_rgb" ] ; then
 do_video_encoding rgb.avi "" "-an -vcodec rawvideo -pix_fmt bgr24"
 do_video_decoding "" "-pix_fmt yuv420p"
@@ -358,5 +363,3 @@ do_audio_enc_dec wav dbl pcm_f64le
 do_audio_enc_dec wav s16 pcm_zork
 do_audio_enc_dec 302 s16 pcm_s24daud "-ac 6 -ar 96000"
 fi
-
-rm -f "$bench" "$bench2"

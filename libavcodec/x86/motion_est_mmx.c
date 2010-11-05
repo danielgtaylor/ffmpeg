@@ -94,27 +94,24 @@ static int sad16_sse2(void *v, uint8_t *blk2, uint8_t *blk1, int stride, int h)
 {
     int ret;
     __asm__ volatile(
-        "pxor %%xmm6, %%xmm6            \n\t"
+        "pxor %%xmm2, %%xmm2            \n\t"
         ASMALIGN(4)
         "1:                             \n\t"
         "movdqu (%1), %%xmm0            \n\t"
-        "movdqu (%1, %3), %%xmm1        \n\t"
+        "movdqu (%1, %4), %%xmm1        \n\t"
         "psadbw (%2), %%xmm0            \n\t"
-        "psadbw (%2, %3), %%xmm1        \n\t"
-        "paddw %%xmm0, %%xmm6           \n\t"
-        "paddw %%xmm1, %%xmm6           \n\t"
-        "lea (%1,%3,2), %1              \n\t"
-        "lea (%2,%3,2), %2              \n\t"
+        "psadbw (%2, %4), %%xmm1        \n\t"
+        "paddw %%xmm0, %%xmm2           \n\t"
+        "paddw %%xmm1, %%xmm2           \n\t"
+        "lea (%1,%4,2), %1              \n\t"
+        "lea (%2,%4,2), %2              \n\t"
         "sub $2, %0                     \n\t"
         " jg 1b                         \n\t"
-        : "+r" (h), "+r" (blk1), "+r" (blk2)
+        "movhlps %%xmm2, %%xmm0         \n\t"
+        "paddw   %%xmm0, %%xmm2         \n\t"
+        "movd    %%xmm2, %3             \n\t"
+        : "+r" (h), "+r" (blk1), "+r" (blk2), "=r"(ret)
         : "r" ((x86_reg)stride)
-    );
-    __asm__ volatile(
-        "movhlps %%xmm6, %%xmm0         \n\t"
-        "paddw   %%xmm0, %%xmm6         \n\t"
-        "movd    %%xmm6, %0             \n\t"
-        : "=r"(ret)
     );
     return ret;
 }
@@ -427,7 +424,9 @@ PIX_SAD(mmx2)
 
 void dsputil_init_pix_mmx(DSPContext* c, AVCodecContext *avctx)
 {
-    if (mm_flags & FF_MM_MMX) {
+    int mm_flags = av_get_cpu_flags();
+
+    if (mm_flags & AV_CPU_FLAG_MMX) {
         c->pix_abs[0][0] = sad16_mmx;
         c->pix_abs[0][1] = sad16_x2_mmx;
         c->pix_abs[0][2] = sad16_y2_mmx;
@@ -440,7 +439,7 @@ void dsputil_init_pix_mmx(DSPContext* c, AVCodecContext *avctx)
         c->sad[0]= sad16_mmx;
         c->sad[1]= sad8_mmx;
     }
-    if (mm_flags & FF_MM_MMX2) {
+    if (mm_flags & AV_CPU_FLAG_MMX2) {
         c->pix_abs[0][0] = sad16_mmx2;
         c->pix_abs[1][0] = sad8_mmx2;
 
@@ -456,7 +455,7 @@ void dsputil_init_pix_mmx(DSPContext* c, AVCodecContext *avctx)
             c->pix_abs[1][3] = sad8_xy2_mmx2;
         }
     }
-    if ((mm_flags & FF_MM_SSE2) && !(mm_flags & FF_MM_3DNOW) && avctx->codec_id != CODEC_ID_SNOW) {
+    if ((mm_flags & AV_CPU_FLAG_SSE2) && !(mm_flags & AV_CPU_FLAG_3DNOW) && avctx->codec_id != CODEC_ID_SNOW) {
         c->sad[0]= sad16_sse2;
     }
 }

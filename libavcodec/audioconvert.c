@@ -27,50 +27,26 @@
 
 #include "libavutil/avstring.h"
 #include "libavutil/libm.h"
+#include "libavcore/samplefmt.h"
 #include "avcodec.h"
 #include "audioconvert.h"
 
-typedef struct SampleFmtInfo {
-    const char *name;
-    int bits;
-} SampleFmtInfo;
-
-/** this table gives more information about formats */
-static const SampleFmtInfo sample_fmt_info[SAMPLE_FMT_NB] = {
-    [SAMPLE_FMT_U8]  = { .name = "u8",  .bits = 8 },
-    [SAMPLE_FMT_S16] = { .name = "s16", .bits = 16 },
-    [SAMPLE_FMT_S32] = { .name = "s32", .bits = 32 },
-    [SAMPLE_FMT_FLT] = { .name = "flt", .bits = 32 },
-    [SAMPLE_FMT_DBL] = { .name = "dbl", .bits = 64 },
-};
-
+#if FF_API_OLD_SAMPLE_FMT
 const char *avcodec_get_sample_fmt_name(int sample_fmt)
 {
-    if (sample_fmt < 0 || sample_fmt >= SAMPLE_FMT_NB)
-        return NULL;
-    return sample_fmt_info[sample_fmt].name;
+    return av_get_sample_fmt_name(sample_fmt);
 }
 
 enum SampleFormat avcodec_get_sample_fmt(const char* name)
 {
-    int i;
-
-    for (i=0; i < SAMPLE_FMT_NB; i++)
-        if (!strcmp(sample_fmt_info[i].name, name))
-            return i;
-    return SAMPLE_FMT_NONE;
+    return av_get_sample_fmt(name);
 }
 
 void avcodec_sample_fmt_string (char *buf, int buf_size, int sample_fmt)
 {
-    /* print header */
-    if (sample_fmt < 0)
-        snprintf (buf, buf_size, "name  " " depth");
-    else if (sample_fmt < SAMPLE_FMT_NB) {
-        SampleFmtInfo info= sample_fmt_info[sample_fmt];
-        snprintf (buf, buf_size, "%-6s" "   %2d ", info.name, info.bits);
-    }
+    av_get_sample_fmt_string(buf, buf_size, sample_fmt);
 }
+#endif
 
 static const char* const channel_names[]={
     "FL", "FR", "FC", "LFE", "BL",  "BR",  "FLC", "FRC",
@@ -120,6 +96,18 @@ static const struct {
     { "7.1+downmix", 10, CH_LAYOUT_7POINT1|CH_LAYOUT_STEREO_DOWNMIX, },
     { 0 }
 };
+
+int64_t avcodec_get_channel_layout(const char *name)
+{
+    int i = 0;
+    do {
+        if (!strcmp(channel_layout_map[i].name, name))
+            return channel_layout_map[i].layout;
+        i++;
+    } while (channel_layout_map[i].name);
+
+    return 0;
+}
 
 void avcodec_get_channel_layout_string(char *buf, int buf_size, int nb_channels, int64_t channel_layout)
 {

@@ -40,7 +40,7 @@ typedef struct {
     AVFrame          *frame;
 
     int w, h;
-    AVFilterPicRef *pic;
+    AVFilterBufferRef *pic;
 } MovieContext;
 
 static int movie_init(AVFilterContext *ctx)
@@ -189,8 +189,9 @@ static int movie_get_frame(AVFilterLink *link)
 
             // Did we get a video frame?
             if(frame_finished) {
-                av_picture_copy((AVPicture *)&mv->pic->data, (AVPicture *)mv->frame,
-                                mv->pic->pic->format, link->w, link->h);
+                av_picture_data_copy(mv->pic->data, mv->pic->linesize,
+                                     mv->frame->data, mv->frame->linesize,
+                                     mv->pic->format, link->w, link->h);
 
                 // Advance in the time line
                 mv->pic->pts = av_rescale_q(packet.pts,
@@ -219,7 +220,7 @@ static int movie_get_frame(AVFilterLink *link)
 
 static int request_frame(AVFilterLink *link)
 {
-    AVFilterPicRef *out;
+    AVFilterBufferRef *out;
     MovieContext *mv = link->src->priv;
 
     movie_get_frame(link);
@@ -227,8 +228,8 @@ static int request_frame(AVFilterLink *link)
     if (mv->is_done)
         return AVERROR_EOF;
 
-    out = avfilter_ref_pic(mv->pic, ~0);
-    out->pixel_aspect = mv->codec_ctx->sample_aspect_ratio;
+    out = avfilter_ref_buffer(mv->pic, ~0);
+    out->video->pixel_aspect = mv->codec_ctx->sample_aspect_ratio;
 
     avfilter_start_frame(link, out);
     avfilter_draw_slice(link, 0, link->h, 1);
@@ -247,7 +248,7 @@ static av_cold void uninit(AVFilterContext *ctx)
         av_close_input_file(mv->format_ctx);
     av_freep(&mv->frame);
     if(mv->pic)
-        avfilter_unref_pic(mv->pic);
+        avfilter_unref_buffer(mv->pic);
 }
 
 AVFilter avfilter_vsrc_movie =

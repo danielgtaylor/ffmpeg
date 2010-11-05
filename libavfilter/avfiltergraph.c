@@ -26,7 +26,12 @@
 #include "avfilter.h"
 #include "avfiltergraph.h"
 
-void avfilter_graph_destroy(AVFilterGraph *graph)
+AVFilterGraph *avfilter_graph_alloc(void)
+{
+    return av_mallocz(sizeof(AVFilterGraph));
+}
+
+void avfilter_graph_free(AVFilterGraph *graph)
 {
     for(; graph->filter_count > 0; graph->filter_count --)
         avfilter_destroy(graph->filters[graph->filter_count - 1]);
@@ -111,7 +116,7 @@ static int query_formats(AVFilterGraph *graph, AVClass *log_ctx)
     int scaler_count = 0;
     char inst_name[30];
 
-    /* ask all the sub-filters for their supported colorspaces */
+    /* ask all the sub-filters for their supported media formats */
     for(i = 0; i < graph->filter_count; i ++) {
         if(graph->filters[i]->filter->query_formats)
             graph->filters[i]->filter->query_formats(graph->filters[i]);
@@ -133,8 +138,7 @@ static int query_formats(AVFilterGraph *graph, AVClass *log_ctx)
                     /* couldn't merge format lists. auto-insert scale filter */
                     snprintf(inst_name, sizeof(inst_name), "auto-inserted scaler %d",
                              scaler_count++);
-                    scale =
-                        avfilter_open(avfilter_get_by_name("scale"),inst_name);
+                    avfilter_open(&scale, avfilter_get_by_name("scale"), inst_name);
 
                     snprintf(scale_args, sizeof(scale_args), "0:0:%s", graph->scale_sws_opts);
                     if(!scale || scale->filter->init(scale, scale_args, NULL) ||
@@ -197,9 +201,22 @@ int avfilter_graph_config_formats(AVFilterGraph *graph, AVClass *log_ctx)
         return -1;
 
     /* Once everything is merged, it's possible that we'll still have
-     * multiple valid colorspace choices. We pick the first one. */
+     * multiple valid media format choices. We pick the first one. */
     pick_formats(graph);
 
     return 0;
 }
 
+int avfilter_graph_config(AVFilterGraph *graphctx, AVClass *log_ctx)
+{
+    int ret;
+
+    if ((ret = avfilter_graph_check_validity(graphctx, log_ctx)))
+        return ret;
+    if ((ret = avfilter_graph_config_formats(graphctx, log_ctx)))
+        return ret;
+    if ((ret = avfilter_graph_config_links(graphctx, log_ctx)))
+        return ret;
+
+    return 0;
+}

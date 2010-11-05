@@ -1,7 +1,7 @@
 include $(SUBDIR)../config.mak
 
 NAME = avcodec
-FFLIBS = avutil
+FFLIBS = avutil avcore
 
 HEADERS = avcodec.h avfft.h dxva2.h opt.h vaapi.h vdpau.h xvmc.h
 
@@ -32,7 +32,9 @@ OBJS-$(CONFIG_DXVA2)                   += dxva2.o
 FFT-OBJS-$(CONFIG_HARDCODED_TABLES)    += cos_tables.o
 OBJS-$(CONFIG_FFT)                     += avfft.o fft.o $(FFT-OBJS-yes)
 OBJS-$(CONFIG_GOLOMB)                  += golomb.o
-OBJS-$(CONFIG_H264DSP)                 += h264dsp.o h264idct.o h264pred.o
+OBJS-$(CONFIG_H264DSP)                 += h264dsp.o h264idct.o
+OBJS-$(CONFIG_H264PRED)                += h264pred.o
+OBJS-$(CONFIG_HUFFMAN)                 += huffman.o
 OBJS-$(CONFIG_LPC)                     += lpc.o
 OBJS-$(CONFIG_LSP)                     += lsp.o
 OBJS-$(CONFIG_MDCT)                    += mdct.o
@@ -42,6 +44,8 @@ OBJS-$(CONFIG_VAAPI)                   += vaapi.o
 OBJS-$(CONFIG_VDPAU)                   += vdpau.o
 
 # decoders/encoders/hardware accelerators
+OBJS-$(CONFIG_A64MULTI_ENCODER)        += a64multienc.o elbg.o
+OBJS-$(CONFIG_A64MULTI5_ENCODER)       += a64multienc.o elbg.o
 OBJS-$(CONFIG_AAC_DECODER)             += aacdec.o aactab.o aacsbr.o aacps.o \
                                           aacadtsdec.o mpeg4audio.o
 OBJS-$(CONFIG_AAC_ENCODER)             += aacenc.o aaccoder.o    \
@@ -60,6 +64,7 @@ OBJS-$(CONFIG_AMRNB_DECODER)           += amrnbdec.o celp_filters.o   \
                                           acelp_pitch_delay.o
 OBJS-$(CONFIG_AMV_DECODER)             += sp5xdec.o mjpegdec.o mjpeg.o
 OBJS-$(CONFIG_ANM_DECODER)             += anm.o
+OBJS-$(CONFIG_ANSI_DECODER)            += ansi.o cga_data.o
 OBJS-$(CONFIG_APE_DECODER)             += apedec.o
 OBJS-$(CONFIG_ASV1_DECODER)            += asv1.o mpeg12data.o
 OBJS-$(CONFIG_ASV1_ENCODER)            += asv1.o mpeg12data.o
@@ -127,12 +132,12 @@ OBJS-$(CONFIG_FLASHSV_DECODER)         += flashsv.o
 OBJS-$(CONFIG_FLASHSV_ENCODER)         += flashsvenc.o
 OBJS-$(CONFIG_FLIC_DECODER)            += flicvideo.o
 OBJS-$(CONFIG_FOURXM_DECODER)          += 4xm.o
-OBJS-$(CONFIG_FRAPS_DECODER)           += fraps.o huffman.o
+OBJS-$(CONFIG_FRAPS_DECODER)           += fraps.o
 OBJS-$(CONFIG_FRWU_DECODER)            += frwu.o
 OBJS-$(CONFIG_GIF_DECODER)             += gifdec.o lzw.o
 OBJS-$(CONFIG_GIF_ENCODER)             += gif.o lzwenc.o
-OBJS-$(CONFIG_GSM_DECODER)             += gsmdec.o
-OBJS-$(CONFIG_GSM_MS_DECODER)          += gsmdec.o
+OBJS-$(CONFIG_GSM_DECODER)             += gsmdec.o gsmdec_data.o msgsmdec.o
+OBJS-$(CONFIG_GSM_MS_DECODER)          += gsmdec.o gsmdec_data.o msgsmdec.o
 OBJS-$(CONFIG_H261_DECODER)            += h261dec.o h261.o \
                                           mpegvideo.o error_resilience.o
 OBJS-$(CONFIG_H261_ENCODER)            += h261enc.o h261.o             \
@@ -284,6 +289,7 @@ OBJS-$(CONFIG_QDRAW_DECODER)           += qdrw.o
 OBJS-$(CONFIG_QPEG_DECODER)            += qpeg.o
 OBJS-$(CONFIG_QTRLE_DECODER)           += qtrle.o
 OBJS-$(CONFIG_QTRLE_ENCODER)           += qtrleenc.o
+OBJS-$(CONFIG_R10K_DECODER)            += r210dec.o
 OBJS-$(CONFIG_R210_DECODER)            += r210dec.o
 OBJS-$(CONFIG_RA_144_DECODER)          += ra144dec.o ra144.o celp_filters.o
 OBJS-$(CONFIG_RA_144_ENCODER)          += ra144enc.o ra144.o celp_filters.o
@@ -375,11 +381,10 @@ OBJS-$(CONFIG_VORBIS_ENCODER)          += vorbis_enc.o vorbis.o \
                                           vorbis_data.o
 OBJS-$(CONFIG_VP3_DECODER)             += vp3.o vp3dsp.o
 OBJS-$(CONFIG_VP5_DECODER)             += vp5.o vp56.o vp56data.o vp56dsp.o \
-                                          vp3dsp.o cabac.o
+                                          vp3dsp.o vp56rac.o
 OBJS-$(CONFIG_VP6_DECODER)             += vp6.o vp56.o vp56data.o vp56dsp.o \
-                                          vp3dsp.o vp6dsp.o huffman.o cabac.o
-OBJS-$(CONFIG_VP8_DECODER)             += vp8.o vp8dsp.o vp56.o vp56data.o \
-                                          h264pred.o cabac.o
+                                          vp3dsp.o vp6dsp.o vp56rac.o
+OBJS-$(CONFIG_VP8_DECODER)             += vp8.o vp8dsp.o vp56rac.o
 OBJS-$(CONFIG_VQA_DECODER)             += vqavideo.o
 OBJS-$(CONFIG_WAVPACK_DECODER)         += wavpack.o
 OBJS-$(CONFIG_WMAPRO_DECODER)          += wmaprodec.o wma.o
@@ -471,6 +476,8 @@ OBJS-$(CONFIG_ADPCM_EA_R1_DECODER)        += adpcm.o
 OBJS-$(CONFIG_ADPCM_EA_R2_DECODER)        += adpcm.o
 OBJS-$(CONFIG_ADPCM_EA_R3_DECODER)        += adpcm.o
 OBJS-$(CONFIG_ADPCM_EA_XAS_DECODER)       += adpcm.o
+OBJS-$(CONFIG_ADPCM_G722_DECODER)         += g722.o
+OBJS-$(CONFIG_ADPCM_G722_ENCODER)         += g722.o
 OBJS-$(CONFIG_ADPCM_G726_DECODER)         += g726.o
 OBJS-$(CONFIG_ADPCM_G726_ENCODER)         += g726.o
 OBJS-$(CONFIG_ADPCM_IMA_AMV_DECODER)      += adpcm.o
@@ -518,7 +525,7 @@ OBJS-$(CONFIG_NUT_MUXER)               += mpegaudiodata.o
 OBJS-$(CONFIG_OGG_DEMUXER)             += flacdec.o flacdata.o flac.o \
                                           dirac.o mpeg12data.o
 OBJS-$(CONFIG_OGG_MUXER)               += xiph.o flacdec.o flacdata.o flac.o
-OBJS-$(CONFIG_RTP_MUXER)               += mpegvideo.o
+OBJS-$(CONFIG_RTP_MUXER)               += mpegvideo.o xiph.o
 OBJS-$(CONFIG_WEBM_MUXER)              += xiph.o mpeg4audio.o \
                                           flacdec.o flacdata.o flac.o
 
@@ -547,6 +554,7 @@ OBJS-$(CONFIG_LIBVORBIS_ENCODER)          += libvorbis.o vorbis_data.o
 OBJS-$(CONFIG_LIBVPX_DECODER)             += libvpxdec.o
 OBJS-$(CONFIG_LIBVPX_ENCODER)             += libvpxenc.o
 OBJS-$(CONFIG_LIBX264_ENCODER)            += libx264.o
+OBJS-$(CONFIG_LIBXAVS_ENCODER)            += libxavs.o
 OBJS-$(CONFIG_LIBXVID)                    += libxvidff.o libxvid_rc.o
 
 # parsers
@@ -568,6 +576,7 @@ OBJS-$(CONFIG_H264_PARSER)             += h264_parser.o h264.o            \
                                           h264_loopfilter.o h264_cabac.o \
                                           h264_cavlc.o h264_ps.o \
                                           mpegvideo.o error_resilience.o
+OBJS-$(CONFIG_AAC_LATM_PARSER)         += latm_parser.o
 OBJS-$(CONFIG_MJPEG_PARSER)            += mjpeg_parser.o
 OBJS-$(CONFIG_MLP_PARSER)              += mlp_parser.o mlp.o
 OBJS-$(CONFIG_MPEG4VIDEO_PARSER)       += mpeg4video_parser.o h263.o \
@@ -608,6 +617,12 @@ OBJS-$(HAVE_W32THREADS)                += w32thread.o
 
 OBJS-$(CONFIG_MLIB)                    += mlib/dsputil_mlib.o           \
 
+# inverse.o contains the ff_inverse table definition, which is used by
+# the FASTDIV macro (from libavutil); since referencing the external
+# table has a negative effect on performance, copy it in libavcodec as
+# well.
+OBJS-$(!CONFIG_SMALL)                  += inverse.o
+
 -include $(SUBDIR)$(ARCH)/Makefile
 
 SKIPHEADERS                             = %_tablegen.h
@@ -622,7 +637,6 @@ SKIPHEADERS                            += mpegaudio3.h
 EXAMPLES = api
 
 TESTPROGS = cabac dct eval fft h264 iirfilter rangecoder snow
-TESTPROGS-$(ARCH_X86) += x86/cpuid
 TESTPROGS-$(HAVE_MMX) += motion
 TESTOBJS = dctref.o
 

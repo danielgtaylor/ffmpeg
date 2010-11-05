@@ -226,14 +226,13 @@ The following abbreviations are recognized:
 
 @item -aspect @var{aspect}
 Set aspect ratio (4:3, 16:9 or 1.3333, 1.7777).
-@item -croptop @var{size} (deprecated - use -vf crop=x:y:width:height instead)
-Set top crop band size (in pixels).
-@item -cropbottom @var{size} (deprecated - use -vf crop=x:y:width:height instead)
-Set bottom crop band size (in pixels).
-@item -cropleft @var{size} (deprecated - use -vf crop=x:y:width:height instead)
-Set left crop band size (in pixels).
-@item -cropright @var{size} (deprecated - use -vf crop=x:y:width:height instead)
-Set right crop band size (in pixels).
+@item -croptop @var{size}
+@item -cropbottom @var{size}
+@item -cropleft @var{size}
+@item -cropright @var{size}
+All the crop options have been removed. Use -vf
+crop=width:height:x:y instead.
+
 @item -padtop @var{size}
 @item -padbottom @var{size}
 @item -padleft @var{size}
@@ -355,8 +354,39 @@ qp offset between P- and B-frames
 @item -i_qoffset @var{offset}
 qp offset between P- and I-frames
 @item -rc_eq @var{equation}
-Set rate control equation (@pxref{FFmpeg formula
-evaluator}) (default = @code{tex^qComp}).
+Set rate control equation (see section "Expression Evaluation")
+(default = @code{tex^qComp}).
+
+When computing the rate control equation expression, besides the
+standard functions defined in the section "Expression Evaluation", the
+following functions are available:
+@table @var
+@item bits2qp(bits)
+@item qp2bits(qp)
+@end table
+
+and the following constants are available:
+@table @var
+@item iTex
+@item pTex
+@item tex
+@item mv
+@item fCode
+@item iCount
+@item mcVar
+@item var
+@item isI
+@item isP
+@item isB
+@item avgQP
+@item qComp
+@item avgIITex
+@item avgPITex
+@item avgPPTex
+@item avgBPTex
+@item avgTex
+@end table
+
 @item -rc_override @var{override}
 rate control override for specific intervals
 @item -me_method @var{method}
@@ -496,6 +526,12 @@ Bitstream filters available are "dump_extra", "remove_extra", "noise", "h264_mp4
 @example
 ffmpeg -i h264.mp4 -vcodec copy -vbsf h264_mp4toannexb -an out.h264
 @end example
+@item -force_key_frames @var{time}[,@var{time}...]
+Force key frames at the specified timestamps, more precisely at the first
+frames after each specified time.
+This option can be useful to ensure that a seek point is present at a
+chapter mark or any other designated place in the output file.
+The timestamps must be specified in ascending order.
 @end table
 
 @section Audio Options
@@ -510,7 +546,10 @@ Set the audio bitrate in bit/s (default = 64k).
 @item -aq @var{q}
 Set the audio quality (codec-specific, VBR).
 @item -ac @var{channels}
-Set the number of audio channels (default = 1).
+Set the number of audio channels. For input streams it is set by
+default to 1, for output streams it is set by default to the same
+number of audio channels in input. If the input file has audio streams
+with different channel count, the behaviour is undefined.
 @item -an
 Disable audio recording.
 @item -acodec @var{codec}
@@ -578,8 +617,19 @@ Set stream mapping from input streams to output streams.
 Just enumerate the input streams in the order you want them in the output.
 @var{sync_stream_id} if specified sets the input stream to sync
 against.
-@item -map_meta_data @var{outfile}:@var{infile}
-Set meta data information of @var{outfile} from @var{infile}.
+@item -map_meta_data @var{outfile}[,@var{metadata}]:@var{infile}[,@var{metadata}]
+Set meta data information of @var{outfile} from @var{infile}. Note that those
+are file indices (zero-based), not filenames.
+Optional @var{metadata} parameters specify, which metadata to copy - (g)lobal
+(i.e. metadata that applies to the whole file), per-(s)tream, per-(c)hapter or
+per-(p)rogram. All metadata specifiers other than global must be followed by the
+stream/chapter/program number. If metadata specifier is omitted, it defaults to
+global.
+For example to copy metadata from the first stream of the input file to global metadata
+of the output file:
+@example
+ffmpeg -i in.ogg -map_meta_data 0:0,s0 out.mp3
+@end example
 @item -debug
 Print specific debug info.
 @item -benchmark
@@ -675,88 +725,7 @@ directories, where @var{codec_name} is the name of the codec to which
 the preset file options will be applied. For example, if you select
 the video codec with @code{-vcodec libx264} and use @code{-vpre max},
 then it will search for the file @file{libx264-max.ffpreset}.
-
-@anchor{FFmpeg formula evaluator}
-@section FFmpeg formula evaluator
-
-When evaluating a rate control string, FFmpeg uses an internal formula
-evaluator.
-
-The following binary operators are available: @code{+}, @code{-},
-@code{*}, @code{/}, @code{^}.
-
-The following unary operators are available: @code{+}, @code{-},
-@code{(...)}.
-
-The following statements are available: @code{ld}, @code{st},
-@code{while}.
-
-The following functions are available:
-@table @var
-@item sinh(x)
-@item cosh(x)
-@item tanh(x)
-@item sin(x)
-@item cos(x)
-@item tan(x)
-@item atan(x)
-@item asin(x)
-@item acos(x)
-@item exp(x)
-@item log(x)
-@item abs(x)
-@item squish(x)
-@item gauss(x)
-@item mod(x, y)
-@item max(x, y)
-@item min(x, y)
-@item eq(x, y)
-@item gte(x, y)
-@item gt(x, y)
-@item lte(x, y)
-@item lt(x, y)
-@item bits2qp(bits)
-@item qp2bits(qp)
-@end table
-
-The following constants are available:
-@table @var
-@item PI
-@item E
-@item iTex
-@item pTex
-@item tex
-@item mv
-@item fCode
-@item iCount
-@item mcVar
-@item var
-@item isI
-@item isP
-@item isB
-@item avgQP
-@item qComp
-@item avgIITex
-@item avgPITex
-@item avgPPTex
-@item avgBPTex
-@item avgTex
-@end table
-
 @c man end
-
-@section Protocols
-
-The file name can be @file{-} to read from standard input or to write
-to standard output.
-
-FFmpeg also handles many protocols specified with an URL syntax.
-
-Use 'ffmpeg -protocols' to see a list of the supported protocols.
-
-The protocol @code{http:} is currently used only to communicate with
-FFserver (see the FFserver documentation). When FFmpeg will be a
-video player it will also be used for streaming :-)
 
 @chapter Tips
 @c man begin TIPS
@@ -827,14 +796,14 @@ standard mixer.
 FFmpeg can grab the X11 display.
 
 @example
-ffmpeg -f x11grab -s cif -i :0.0 /tmp/out.mpg
+ffmpeg -f x11grab -s cif -r 25 -i :0.0 /tmp/out.mpg
 @end example
 
 0.0 is display.screen number of your X11 server, same as
 the DISPLAY environment variable.
 
 @example
-ffmpeg -f x11grab -s cif -i :0.0+10,20 /tmp/out.mpg
+ffmpeg -f x11grab -s cif -r 25 -i :0.0+10,20 /tmp/out.mpg
 @end example
 
 0.0 is display.screen number of your X11 server, same as the DISPLAY environment
@@ -964,6 +933,10 @@ options have to be specified immediately after the name of the output
 file to which you want to add them.
 @c man end EXAMPLES
 
+@include eval.texi
+@include indevs.texi
+@include outdevs.texi
+@include protocols.texi
 @include filters.texi
 
 @ignore

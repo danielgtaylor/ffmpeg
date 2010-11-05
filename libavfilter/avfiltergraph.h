@@ -32,6 +32,11 @@ typedef struct AVFilterGraph {
 } AVFilterGraph;
 
 /**
+ * Allocate a filter graph.
+ */
+AVFilterGraph *avfilter_graph_alloc(void);
+
+/**
  * Get a filter instance with name name from graph.
  *
  * @return the pointer to the found filter instance or NULL if it
@@ -70,8 +75,16 @@ int avfilter_graph_config_links(AVFilterGraph *graphctx, AVClass *log_ctx);
 int avfilter_graph_config_formats(AVFilterGraph *graphctx, AVClass *log_ctx);
 
 /**
+ * Check validity and configure all the links and formats in the graph.
+ *
+ * @see avfilter_graph_check_validity(), avfilter_graph_config_links(),
+ * avfilter_graph_config_formats()
+ */
+int avfilter_graph_config(AVFilterGraph *graphctx, AVClass *log_ctx);
+
+/**
  * Free a graph and destroy its links.
  */
-void avfilter_graph_destroy(AVFilterGraph *graph);
+void avfilter_graph_free(AVFilterGraph *graph);
 
 #endif  /* AVFILTER_AVFILTERGRAPH_H */

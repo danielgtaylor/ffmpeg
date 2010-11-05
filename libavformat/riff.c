@@ -59,6 +59,7 @@ const AVCodecTag ff_codec_bmp_tags[] = {
     { CODEC_ID_MPEG4,        MKTAG('S', 'E', 'D', 'G') },
     { CODEC_ID_MPEG4,        MKTAG('R', 'M', 'P', '4') },
     { CODEC_ID_MPEG4,        MKTAG('3', 'I', 'V', '2') },
+    { CODEC_ID_MPEG4,        MKTAG('W', 'A', 'W', 'V') }, /* WaWv MPEG-4 Video Codec */
     { CODEC_ID_MPEG4,        MKTAG('F', 'F', 'D', 'S') },
     { CODEC_ID_MPEG4,        MKTAG('F', 'V', 'F', 'W') },
     { CODEC_ID_MPEG4,        MKTAG('D', 'C', 'O', 'D') },
@@ -81,8 +82,8 @@ const AVCodecTag ff_codec_bmp_tags[] = {
     { CODEC_ID_MPEG4,        MKTAG('U', 'L', 'D', 'X') },
     { CODEC_ID_MPEG4,        MKTAG('G', 'E', 'O', 'V') },
     { CODEC_ID_MPEG4,        MKTAG('S', 'I', 'P', 'P') }, /* Samsung SHR-6040 */
-    { CODEC_ID_MSMPEG4V3,    MKTAG('D', 'I', 'V', '3') }, /* default signature when using MSMPEG4 */
     { CODEC_ID_MSMPEG4V3,    MKTAG('M', 'P', '4', '3') },
+    { CODEC_ID_MSMPEG4V3,    MKTAG('D', 'I', 'V', '3') },
     { CODEC_ID_MSMPEG4V3,    MKTAG('M', 'P', 'G', '3') },
     { CODEC_ID_MSMPEG4V3,    MKTAG('D', 'I', 'V', '5') },
     { CODEC_ID_MSMPEG4V3,    MKTAG('D', 'I', 'V', '6') },
@@ -178,6 +179,7 @@ const AVCodecTag ff_codec_bmp_tags[] = {
     { CODEC_ID_RAWVIDEO,     MKTAG('Y', 'U', 'V', '9') },
     { CODEC_ID_RAWVIDEO,     MKTAG('Y', 'V', 'U', '9') },
     { CODEC_ID_FRWU,         MKTAG('F', 'R', 'W', 'U') },
+    { CODEC_ID_R10K,         MKTAG('R', '1', '0', 'k') },
     { CODEC_ID_R210,         MKTAG('r', '2', '1', '0') },
     { CODEC_ID_V210,         MKTAG('v', '2', '1', '0') },
     { CODEC_ID_INDEO3,       MKTAG('I', 'V', '3', '1') },
@@ -225,6 +227,7 @@ const AVCodecTag ff_codec_bmp_tags[] = {
     { CODEC_ID_QPEG,         MKTAG('Q', '1', '.', '0') },
     { CODEC_ID_QPEG,         MKTAG('Q', '1', '.', '1') },
     { CODEC_ID_WMV3,         MKTAG('W', 'M', 'V', '3') },
+    { CODEC_ID_WMV3,         MKTAG('W', 'M', 'V', 'P') },
     { CODEC_ID_VC1,          MKTAG('W', 'V', 'C', '1') },
     { CODEC_ID_VC1,          MKTAG('W', 'M', 'V', 'A') },
     { CODEC_ID_LOCO,         MKTAG('L', 'O', 'C', 'O') },

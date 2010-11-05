@@ -28,6 +28,7 @@
  */
 
 #include "libavutil/intmath.h"
+#include "libavcore/imgutils.h"
 #include "avcodec.h"
 #include "dsputil.h"
 #include "internal.h"
@@ -497,7 +498,7 @@ av_cold int MPV_common_init(MpegEncContext *s)
 
     if(s->codec_id == CODEC_ID_MPEG2VIDEO && !s->progressive_sequence)
         s->mb_height = (s->height + 31) / 32 * 2;
-    else
+    else if (s->codec_id != CODEC_ID_H264)
         s->mb_height = (s->height + 15) / 16;
 
     if(s->avctx->pix_fmt == PIX_FMT_NONE){
@@ -510,7 +511,7 @@ av_cold int MPV_common_init(MpegEncContext *s)
         return -1;
     }
 
-    if((s->width || s->height) && avcodec_check_dimensions(s->avctx, s->width, s->height))
+    if((s->width || s->height) && av_image_check_size(s->width, s->height, 0, s->avctx))
         return -1;
 
     dsputil_init(&s->dsp, s->avctx);
@@ -962,7 +963,14 @@ int MPV_frame_start(MpegEncContext *s, AVCodecContext *avctx)
             return -1;
 
         s->current_picture_ptr= pic;
-        s->current_picture_ptr->top_field_first= s->top_field_first; //FIXME use only the vars from current_pic
+        //FIXME use only the vars from current_pic
+        if(s->codec_id == CODEC_ID_MPEG1VIDEO || s->codec_id == CODEC_ID_MPEG2VIDEO) {
+            if(s->picture_structure == PICT_FRAME)
+                s->current_picture_ptr->top_field_first= s->top_field_first;
+            else
+                s->current_picture_ptr->top_field_first= (s->picture_structure == PICT_TOP_FIELD) == s->first_field;
+        } else
+            s->current_picture_ptr->top_field_first= s->top_field_first;
         s->current_picture_ptr->interlaced_frame= !s->progressive_frame && !s->progressive_sequence;
     }
 
@@ -1254,7 +1262,7 @@ void ff_print_debug_info(MpegEncContext *s, AVFrame *pict){
                         av_log(s->avctx, AV_LOG_DEBUG, "?");
 
 
-                    if(IS_INTERLACED(mb_type) && s->codec_id == CODEC_ID_H264)
+                    if(IS_INTERLACED(mb_type))
                         av_log(s->avctx, AV_LOG_DEBUG, "=");
                     else
                         av_log(s->avctx, AV_LOG_DEBUG, " ");

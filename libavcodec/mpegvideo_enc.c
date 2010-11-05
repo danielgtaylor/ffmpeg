@@ -351,12 +351,12 @@ av_cold int MPV_encode_init(AVCodecContext *avctx)
         av_log(avctx, AV_LOG_INFO, "impossible bitrate constraints, this will fail\n");
     }
 
-    if(avctx->rc_buffer_size && avctx->bit_rate*av_q2d(avctx->time_base) > avctx->rc_buffer_size){
+    if(avctx->rc_buffer_size && avctx->bit_rate*(int64_t)avctx->time_base.num > avctx->rc_buffer_size * (int64_t)avctx->time_base.den){
         av_log(avctx, AV_LOG_ERROR, "VBV buffer too small for bitrate\n");
         return -1;
     }
 
-    if(avctx->bit_rate*av_q2d(avctx->time_base) > avctx->bit_rate_tolerance){
+    if(!s->fixed_qscale && avctx->bit_rate*av_q2d(avctx->time_base) > avctx->bit_rate_tolerance){
         av_log(avctx, AV_LOG_ERROR, "bitrate tolerance too small for bitrate\n");
         return -1;
     }
@@ -570,7 +570,7 @@ av_cold int MPV_encode_init(AVCodecContext *avctx)
         break;
     case CODEC_ID_H263:
         if (!CONFIG_H263_ENCODER)  return -1;
-        if (ff_match_2uint16(h263_format, FF_ARRAY_ELEMS(h263_format), s->width, s->height) == 7) {
+        if (ff_match_2uint16(h263_format, FF_ARRAY_ELEMS(h263_format), s->width, s->height) == 8) {
             av_log(avctx, AV_LOG_INFO, "The specified picture size of %dx%d is not valid for the H.263 codec.\nValid sizes are 128x96, 176x144, 352x288, 704x576, and 1408x1152. Try H.263+.\n", s->width, s->height);
             return -1;
         }
@@ -618,7 +618,7 @@ av_cold int MPV_encode_init(AVCodecContext *avctx)
         s->h263_aic=1;
         s->h263_plus=1;
         s->loop_filter=1;
-        s->unrestricted_mv= s->obmc || s->loop_filter || s->umvplus;
+        s->unrestricted_mv= 0;
         break;
     case CODEC_ID_MPEG4:
         s->out_format = FMT_H263;
